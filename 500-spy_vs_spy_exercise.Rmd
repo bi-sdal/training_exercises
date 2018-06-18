@@ -1,0 +1,182 @@
+---
+title: "Filtering Data"
+output:
+  html_document:
+    df_print: paged
+  html_notebook:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Learning Objective
+Our goal is to filter observations by temporal, spatial, and topic dimensions.
+
+### Scenario
+Imagine that you are a spy and are trying to catch an enemy spy. Your intelligence network has compilated some strange transmissions for the past year and recorded the origin.
+
+### Objective
+Narrow down the possible leads to the enemy by filtering out the messages related to operational codewords within 5 kilometers of the suspected area taking into account when the enemy spy has been in town.
+
+### Housekeeping
+```{r housekeeping}
+# loading packages
+pacman::p_load(docstring, purrr, stringi, stringr, lubridate, geosphere, dplyr, data.table, dtplyr)
+# globals
+CODENAMES = c('Saitama', 'Sadaharu', 'Aizen', 'El Psy Kongroo')
+```
+
+### Obtaining the Intelligence Report
+
+```{r devdata, echo=FALSE}
+random_dt = function(n = 1e2,
+                     st = as.Date(x = '2017-01-01'),
+                     et = as.Date(x = '2017-12-31')) {
+  #' Generates a series of n datetimes in the range of st and et
+  #' 
+  #' @param n how many datetimes to generate (default = 1e2)
+  #' @param st start datetime (default = as.Date(x = '2017-01-01'))
+  #' @param et end datetime (default = as.Date(x = '2017-12-31'))
+  st = as.POSIXct(x = st)
+  et = as.POSIXct(x = et)
+  dt = as.numeric(x = difftime(time1 = et, time2 = st, units = 'sec'))
+  ev = sort(x = runif(n = n, min = 0, max = dt))
+  rt = st + ev
+  }
+secret_messages = function(p, codenames = CODENAMES) {
+  #' Generates a message with p probability of including a codename
+  #' 
+  #' @param p probability of including a codename
+  #' @param codenames possible codenames to include one
+  if ((p <= 0) | (p >= 1)) {
+    stop('p must a positive values less than one')
+    }
+    if (p > runif(n = 1)) {
+      codename = sample(x = codenames, size = 1L)
+      secret = str_split(string = codename, pattern = ' ') %>%
+        getElement(name = 1L) %>%
+        str_c(collapse = stri_rand_strings(n = 1L, length = 1L))
+      output = str_c(stri_rand_strings(n = 1L,
+                                       length = sample(x = 0:20,
+                                                       size = 1L)),
+                     secret,
+                     stri_rand_strings(n = 1L,
+                                       length = sample(x = 0:20,
+                                                       size = 1L)))
+      } else {
+        output = stri_rand_strings(n = 1L,
+                                   length = sample(20:35,
+                                                   size = 1L))
+        }
+    return(value = output)
+  }
+generate_intelligence_report = function() {
+  #' Generates the intelligence report.
+  #' 
+  #' @return A data.table with geocoded and timestamp encrypted messages.
+  #' @examples generate_intelligence_report()
+  set.seed(seed = 0L)
+  # Helpers
+  intelligence_report = data.table(
+    datetime = random_dt(),
+    longitude = runif(n = 100,
+                      min = 38.880786 - 2,
+                      max = 38.88078 + 2),
+    latitude = runif(n = 100,
+                     min = -77.115874 - 2e-1,
+                     max = -77.115874 + 2e-1),
+    message = map_chr(.x = runif(n = 100,
+                               min = 1e-1,
+                               max = 9e-1),
+                    .f = secret_messages))
+  return(value = intelligence_report)
+  }
+```
+
+```{r data}
+intelligence_report = generate_intelligence_report()
+head(intelligence_report)
+```
+
+### Codenames
+
+Identify the following codenames in the messages:
+
+- Saitama
+- Sadaharu
+- Aizen
+- El Psy Kongroo
+
+If a codename has a space it may be masked by some random character so be aware of the masking techniques.
+
+```{r messages}
+intelligence_report = intelligence_report %>%
+  mutate(codename = str_detect(string = message,
+                               pattern = '(Saitama|Sadaharu|Aizen|El\\wPsy\\wKongroo)'))
+head(intelligence_report)
+```
+
+### Spatial Filter
+
+- The suspected enemy HQ is located at 38.880786, -77.115874.
+
+- Compute the distance between the origin of the message and the suspected enemy HQ
+
+- Identify those that are nearby (in a 25 km area)
+
+```{r spatial}
+compute_distance_from_hq_in_km = function(lon, lat) {
+  #' Computes the distance from the enemy HQ in km.
+  #' 
+  #' @return Distance in kilometers.
+  #' @examples compute_distance_from_hq_in_km(c(38.880786, -77.115874))
+  output = distm(x = c(lon, lat),
+                 y = c(38.880786, -77.115874),
+                 fun = distVincentyEllipsoid) / 1e3
+  return(value = output)
+  }
+intelligence_report = intelligence_report %>%
+  mutate(nearby = map2_dbl(.x = longitude,
+               .y = latitude,
+               .f = compute_distance_from_hq_in_km) <= 25)
+head(intelligence_report)
+```
+
+### Temporal Filter
+
+Our reports indicate that the enemy spy likes to go the HQ Monday and Tuesday nights for TRIVIA night.
+
+- Trivia night is Monday and Tuesday from 19:30 to 22:00
+
+```{r trivia}
+is_trivia = function(dt) {
+  if (wday(x = dt) %in% 2:3) { # Is it Monday or Tuesday
+    that_day = as.Date(x = dt)
+    output = dt %within% interval(start = as.POSIXct(x = str_c(that_day,
+                                                               '19:30')),
+                                  end = as.POSIXct(x = str_c(that_day,
+                                                             '22:00')))
+  } else {
+    output = FALSE
+  }
+  return(value = output)
+  }
+intelligence_report = intelligence_report %>%
+  mutate(trivia = map_lgl(.x = datetime,
+                          .f = is_trivia))
+head(intelligence_report)
+```
+
+### Natural Language Filter
+
+Finding out the secret! Who is behind everything? Find the codename that matches the criteria
+
+```{r decode}
+output = intelligence_report %>%
+  filter(codename & nearby & trivia) %>%
+  pull(var = message) %>%
+  str_extract(pattern = '(Saitama|Sadaharu|Aizen|El\\wPsy\\wKongroo)')
+print(output)
+```
