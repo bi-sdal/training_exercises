@@ -18,7 +18,7 @@ Our goal is to filter observations by temporal, spatial, and topic dimensions.
 Imagine that you are a spy and are trying to catch an enemy spy. Your intelligence network has compilated some strange transmissions for the past year and recorded the origin.
 
 ### Objective
-Narrow down the possible leads to the enemy by filtering out the messages related to operational codewords within 5 kilometers of the suspected area taking into account when the enemy spy has been in town.
+Narrow down the possible leads to the enemy by filtering out the messages related to operational codewords within 25 kilometers of the suspected area taking into account when the enemy spy has been in town.
 
 ### Housekeeping
 ```{r housekeeping}
@@ -35,7 +35,7 @@ random_dt = function(n = 1e2,
                      st = as.Date(x = '2017-01-01'),
                      et = as.Date(x = '2017-12-31')) {
   #' Generates a series of n datetimes in the range of st and et
-  #' 
+  #'
   #' @param n how many datetimes to generate (default = 1e2)
   #' @param st start datetime (default = as.Date(x = '2017-01-01'))
   #' @param et end datetime (default = as.Date(x = '2017-12-31'))
@@ -47,7 +47,7 @@ random_dt = function(n = 1e2,
   }
 secret_messages = function(p, codenames = CODENAMES) {
   #' Generates a message with p probability of including a codename
-  #' 
+  #'
   #' @param p probability of including a codename
   #' @param codenames possible codenames to include one
   if ((p <= 0) | (p >= 1)) {
@@ -74,7 +74,7 @@ secret_messages = function(p, codenames = CODENAMES) {
   }
 generate_intelligence_report = function() {
   #' Generates the intelligence report.
-  #' 
+  #'
   #' @return A data.table with geocoded and timestamp encrypted messages.
   #' @examples generate_intelligence_report()
   set.seed(seed = 0L)
@@ -129,7 +129,7 @@ head(intelligence_report)
 ```{r spatial}
 compute_distance_from_hq_in_km = function(lon, lat) {
   #' Computes the distance from the enemy HQ in km.
-  #' 
+  #'
   #' @return Distance in kilometers.
   #' @examples compute_distance_from_hq_in_km(c(38.880786, -77.115874))
   output = distm(x = c(lon, lat),
